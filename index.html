@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YMCA Lap Pool Schedule – Lane-Based View</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --hour-height: 60px;
+      --lane-width: calc(100% / 6);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #f7fafc 0%, #eef3f9 100%);
+      padding: 20px;
+    }
+
+    .page-container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .page-header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .page-header p {
+      color: #666;
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-sm {
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+    }
+
+    /* Panel and summary */
+    .panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(219, 227, 238, 0.8);
+      border-radius: 20px;
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.08);
+      overflow: hidden;
+    }
+
+    .panel-summary {
+      padding: 18px 20px;
+      border-bottom: 1px solid #dbe3ee;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .summary-info h2 {
+      margin: 0 0 4px;
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .summary-info p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .legend-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: #555;
+    }
+
+    .legend-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    /* Legend color classes */
+    .legend-swatch.lap-swim { background: #dbeaf3; }
+    .legend-swatch.water-walking { background: #ead8ee; }
+    .legend-swatch.lessons { background: #efe2a6; }
+    .legend-swatch.swim-team { background: #1789c7; }
+    .legend-swatch.fitness { background: #b8d4b8; }
+    .legend-swatch.zumba { background: #96c595; }
+    .legend-swatch.deep-water-jog { background: #8eb88d; }
+    .legend-swatch.arthritis { background: #aec59c; }
+    .legend-swatch.program { background: #6aa7d8; }
+    .legend-swatch.family-swim { background: #8abce3; }
+    .legend-swatch.other { background: #d9dee7; }
+    .legend-swatch.placeholder { background: #ddd; }
+
+
+    /* Schedule wrapper */
+    .schedule-wrapper {
+      overflow-x: auto;
+      padding: 0 0 12px;
+    }
+
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: 84px repeat(7, minmax(320px, 1fr));
+      gap: 0;
+      min-width: 2324px;
+      background: white;
+    }
+
+    /* Corner and headers */
+    .grid-corner {
+      background: #e6c94a;
+      border-right: 1px solid rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: #333;
+      min-height: 60px;
+      padding: 4px;
+    }
+
+    .day-header {
+      background: #e6c94a;
+      border-right: 1px solid rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      padding: 8px 6px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #333;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .day-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .day-date {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #333;
+      opacity: 0.9;
+    }
+
+    /* Time column */
+    .time-col {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.8) 100%);
+      border-right: 2px solid rgba(0, 0, 0, 0.08);
+      position: relative;
+      min-height: calc(var(--hour-height) * 16.5);
+    }
+
+    .time-label {
+      position: absolute;
+      right: 8px;
+      transform: translateY(-50%);
+      font-size: 0.75rem;
+      color: #777;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    /* Day columns */
+    .day-col {
+      position: relative;
+      border-right: 1px solid rgba(0, 0, 0, 0.08);
+      background-color: #f9f9f9;
+      background-image:
+        linear-gradient(to right, #e8e8e8 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(120, 136, 160, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(120, 136, 160, 0.04) 1px, transparent 1px);
+      background-size:
+        calc(100% / 6) 100%,
+        100% var(--hour-height),
+        100% calc(var(--hour-height) / 2);
+      background-position: 0 0, 0 0, 0 0;
+      min-height: calc(var(--hour-height) * 16.5);
+    }
+
+    /* Events */
+    .event {
+      position: absolute;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 6px;
+      font-size: 0.8rem;
+      line-height: 1.3;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    .event-title {
+      font-weight: 700;
+      margin-bottom: 3px;
+      font-size: 0.8rem;
+      white-space: normal;
+      overflow-wrap: normal;
+      word-break: normal;
+      line-height: 1.2;
+    }
+
+    .event.water-walking .event-title {
+      white-space: normal;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .event.lessons .event-title {
+      white-space: nowrap;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .event.one-lane {
+      padding: 4px 3px;
+    }
+
+    .event.one-lane .event-title {
+      font-size: 0.72rem;
+      line-height: 1.1;
+      margin-bottom: 2px;
+    }
+
+    .event.one-lane .event-time {
+      font-size: 0.65rem;
+      line-height: 1.1;
+    }
+
+    .null-space-block {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      background: rgba(180, 180, 180, 0.24);
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .event-time {
+      font-size: 0.75rem;
+      opacity: 0.85;
+      margin-bottom: 2px;
+    }
+
+    .event-meta {
+      font-size: 0.7rem;
+      opacity: 0.75;
+    }
+
+    .event.compact .event-meta { display: none; }
+    .event.tiny .event-time { display: none; }
+
+    /* Colors */
+    .event.lap-swim { background: #dbeaf3; }
+    .event.water-walking { background: #ead8ee; }
+    .event.lessons { background: #efe2a6; }
+    .event.swim-team { background: #1789c7; color: white; }
+    .event.swim-team .event-time,
+    .event.swim-team .event-meta { color: rgba(255, 255, 255, 0.9); }
+    .event.fitness { background: #b8d4b8; }
+    .event.zumba { background: #96c595; }
+    .event.deep-water-jog { background: #8eb88d; }
+    .event.arthritis { background: #aec59c; }
+    .event.program { background: #6aa7d8; }
+    .event.family-swim { background: #8abce3; }
+    .event.placeholder { background: #ddd; opacity: 0.7; color: #666; border-style: dashed; }
+
+    /* Utility */
+    .alert-info-sm {
+      font-size: 0.9rem;
+      padding: 12px 14px;
+      margin: 0;
+    }
+
+    .error-state {
+      padding: 20px;
+      text-align: center;
+      color: #666;
+    }
+
+    @media (max-width: 768px) {
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .page-header h1 {
+        font-size: 1.8rem;
+      }
+      .controls {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Lap Pool Weekly Schedule</h1>
+      <p>Lane-based view with exact pool layout (6 lanes per day)</p>
+    </div>
+    <div class="controls">
+      <button id="loadDefaultBtn" class="btn btn-sm btn-primary">Load lap_pool_week.json</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-summary">
+      <div class="summary-info">
+        <h2 id="assocName">No data loaded</h2>
+        <p id="weekRange">Run Python script first, then load the JSON file.</p>
+      </div>
+      <div class="legend-row" id="legend"></div>
+    </div>
+
+    <div class="schedule-wrapper">
+      <div class="schedule-grid" id="scheduleGrid"></div>
+    </div>
+
+    <div style="padding: 14px 18px; color: #666; font-size: 0.9rem; border-top: 1px solid #dbe3ee;">
+      Week view spans Monday-Sunday. Times show local (5:00am-9:30pm grid).
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// ============================================================================
+// CONFIGURATION: Swim Team & Lessons Placeholders (exact schedule)
+// ============================================================================
+
+const SWIM_TEAM_SCHEDULE = {
+  "Monday": [
+    { start: "16:30", end: "17:45", lanes: 3 },
+    { start: "17:45", end: "19:15", lanes: 3 },
+    { start: "19:15", end: "20:45", lanes: 2 },
+  ],
+  "Tuesday": [
+    { start: "16:30", end: "17:45", lanes: 3 },
+    { start: "17:45", end: "19:15", lanes: 3 },
+    { start: "19:15", end: "20:45", lanes: 2 },
+  ],
+  "Wednesday": [
+    { start: "16:30", end: "17:30", lanes: 4 },
+    { start: "17:30", end: "19:00", lanes: 3 },
+    { start: "19:00", end: "20:45", lanes: 2 },
+  ],
+  "Thursday": [
+    { start: "16:30", end: "17:45", lanes: 4 },
+    { start: "17:45", end: "19:15", lanes: 3 },
+    { start: "19:15", end: "20:45", lanes: 2 },
+  ],
+  "Friday": [
+    { start: "16:30", end: "17:30", lanes: 4 },
+    { start: "17:30", end: "19:00", lanes: 3 },
+    { start: "19:00", end: "20:30", lanes: 2 },
+  ],
+  "Saturday": [],
+  "Sunday": [
+    { start: "08:00", end: "09:15", lanes: 3 },
+    { start: "09:15", end: "10:45", lanes: 3 },
+  ],
+};
+
+// Lessons: currently only Wednesday from source; expanded below if user provides more
+const LESSONS_SCHEDULE = {
+  "Monday": [],
+  "Tuesday": [],
+  "Wednesday": [
+    { start: "16:00", end: "16:30", lanes: 1 },
+    { start: "16:30", end: "20:00", lanes: 2 },
+    { start: "20:00", end: "20:30", lanes: 1 },
+  ],
+  "Thursday": [],
+  "Friday": [],
+  "Saturday": [],
+  "Sunday": [],
+};
+
+const DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const COLOR_LABELS = {
+  "lap-swim": "Lap swim",
+  "water-walking": "Water walking",
+  "lessons": "Lessons",
+  "swim-team": "Swim team",
+  "fitness": "Water fitness",
+  "zumba": "Aqua zumba",
+  "deep-water-jog": "Deep water jog",
+  "arthritis": "Aqua arthritis",
+  "program": "Program / whole pool",
+  "family-swim": "Family swim",
+  "other": "Other"
+};
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function minutesSinceMidnight(isoString) {
+  const d = new Date(isoString);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function minutesToPercent(minutes, startMin = 300, endMin = 1290) {
+  return ((minutes - startMin) / (endMin - startMin)) * 100;
+}
+
+function durationToPercent(startMin, endMin, displayStart = 300, displayEnd = 1290) {
+  return ((endMin - startMin) / (displayEnd - displayStart)) * 100;
+}
+
+function getEventColorClass(event) {
+  const title = (event.title || "").toLowerCase();
+  const category = (event.category || "").toLowerCase();
+
+  if (title.includes("lap swim")) return "lap-swim";
+  if (title.includes("water walking")) return "water-walking";
+  if (title.includes("lesson")) return "lessons";
+  if (title.includes("swim team")) return "swim-team";
+  if (title.includes("family swim")) return "family-swim";
+  if (title.includes("program in progress") || title.includes("whole pool")) return "program";
+  if (title.includes("aqua zumba") || title.includes("zumba")) return "zumba";
+  if (title.includes("deep water jog")) return "deep-water-jog";
+  if (title.includes("aqua arthritis") || title.includes("arthritis")) return "arthritis";
+  if (title.includes("fitness")) return "fitness";
+  return "other";
+}
+
+function getLaneStartAndSpan(event) {
+  const title = (event.title || "").toLowerCase();
+  const startHour = Number.isFinite(new Date(event.start).getHours()) ? new Date(event.start).getHours() : 0;
+
+  // Enforce lane rules for green blocks even when older JSON has stale lane_span.
+  if (
+    title.includes("water fitness cardio") ||
+    title.includes("water fitness") ||
+    title.includes("aqua zumba") ||
+    title.includes("aqua arthritis") ||
+    title.includes("aqua arthritist")
+  ) {
+    return { lane_start: 0, lane_span: 4 };
+  }
+
+  if (title.includes("deep water jog")) {
+    return { lane_start: 0, lane_span: startHour < 12 ? 4 : 3 };
+  }
+
+  // Use existing lane_start/lane_span if present
+  if (event.lane_start !== undefined && event.lane_span !== undefined) {
+    let laneStart = Number(event.lane_start);
+    let laneSpan = Number(event.lane_span);
+
+    if (!Number.isFinite(laneStart) || !Number.isFinite(laneSpan) || laneSpan <= 0) {
+      laneStart = 0;
+      laneSpan = 6;
+    }
+
+    // If data appears to be 1-based and overflows 6 lanes, convert to 0-based.
+    if (laneStart >= 1 && laneStart <= 6 && laneStart + laneSpan > 6 && (laneStart - 1) + laneSpan <= 6) {
+      laneStart -= 1;
+    }
+
+    laneSpan = Math.min(6, Math.max(1, laneSpan));
+    laneStart = Math.max(0, Math.min(6 - laneSpan, laneStart));
+
+    return { lane_start: laneStart, lane_span: laneSpan };
+  }
+
+  // Fallback: infer from title/category
+  const lanes = event.lanes || 6;
+
+  if (title.includes("water walking")) {
+    return { lane_start: 0, lane_span: 1 };
+  }
+  if (title.includes("lap swim")) {
+    return { lane_start: 6 - lanes, lane_span: lanes };
+  }
+  if (title.includes("swim team")) {
+    // Right-justified
+    return { lane_start: 6 - lanes, lane_span: lanes };
+  }
+  if (title.includes("lesson")) {
+    // Left-justified
+    return { lane_start: 0, lane_span: lanes };
+  }
+
+  // Default: center
+  const start = Math.max(1, Math.floor((6 - lanes) / 2));
+  return { lane_start: start, lane_span: lanes };
+}
+
+function adjustLapSwimForSwimTeam(event, dayEvents, laneStart, laneSpan) {
+  const title = (event.title || "").toLowerCase();
+  const weekday = event.weekday || event.day || "";
+  if (!title.includes("lap swim")) return { lane_start: laneStart, lane_span: laneSpan };
+  if (!["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].includes(weekday)) {
+    return { lane_start: laneStart, lane_span: laneSpan };
+  }
+  if (laneSpan < 1 || laneSpan > 3) return { lane_start: laneStart, lane_span: laneSpan };
+
+  const startMin = minutesSinceMidnight(event.start);
+  if (startMin < 16 * 60) return { lane_start: laneStart, lane_span: laneSpan };
+  const endMin = minutesSinceMidnight(event.end);
+
+  const overlappingSwim = dayEvents.find((other) => {
+    if ((other.title || "").toLowerCase() !== "swim team") return false;
+    const oStart = minutesSinceMidnight(other.start);
+    const oEnd = minutesSinceMidnight(other.end);
+    return startMin < oEnd && endMin > oStart;
+  });
+
+  if (!overlappingSwim) return { lane_start: laneStart, lane_span: laneSpan };
+
+  const swimPlacement = getLaneStartAndSpan(overlappingSwim);
+  const adjustedStart = Math.max(0, Math.min(6 - laneSpan, swimPlacement.lane_start - laneSpan));
+  return { lane_start: adjustedStart, lane_span: laneSpan };
+}
+
+function formatTime(isoString) {
+  const d = new Date(isoString);
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const suffix = h >= 12 ? "pm" : "am";
+  const hh = ((h + 11) % 12) + 1;
+  return `${hh}:${String(m).padStart(2, "0")}${suffix}`;
+}
+
+function formatDateShort(dateString) {
+  if (!dateString) return "";
+  // dateString: "2026-03-16"
+  const [y, m, d] = dateString.split("-");
+  return `${m}/${d}`;
+}
+
+function isSwimTeamSeasonFromDate(dateString) {
+  if (!dateString) return true;
+  const month = Number(String(dateString).slice(5, 7));
+  return month >= 9 || month <= 5;
+}
+
+// ============================================================================
+// BUILD PLACEHOLDER EVENTS
+// ============================================================================
+
+function buildPlaceholderEvents(baseDate, dayName, existingEvents) {
+  const events = [];
+  const [year, month, day] = baseDate.split("-");
+  const swimTeamInSeason = isSwimTeamSeasonFromDate(baseDate);
+
+  // Check if this day already has real Lessons or Swim Team entries
+  const hasLessons = existingEvents.some(e => e.weekday === dayName && e.title.toLowerCase().includes("lesson"));
+  const hasSwimTeam = existingEvents.some(e => e.weekday === dayName && e.title.toLowerCase().includes("swim team"));
+
+  // Only add placeholders if not already in real data
+  if (swimTeamInSeason && !hasSwimTeam) {
+    const swimTeamBlocks = SWIM_TEAM_SCHEDULE[dayName] || [];
+    swimTeamBlocks.forEach((block, idx) => {
+      const startISO = `${year}-${month}-${day}T${block.start}:00`;
+      const endISO = `${year}-${month}-${day}T${block.end}:00`;
+      events.push({
+        date: baseDate,
+        weekday: dayName,
+        title: "Swim Team",
+        raw_title: "Swim Team",
+        category: "placeholder",
+        lanes: block.lanes,
+        start: startISO,
+        end: endISO,
+        start_time: formatTime(startISO),
+        end_time: formatTime(endISO),
+        is_placeholder: true,
+      });
+    });
+  }
+
+  // Only add placeholders if not already in real data
+  if (!hasLessons) {
+    const lessonsBlocks = LESSONS_SCHEDULE[dayName] || [];
+    lessonsBlocks.forEach((block, idx) => {
+      const startISO = `${year}-${month}-${day}T${block.start}:00`;
+      const endISO = `${year}-${month}-${day}T${block.end}:00`;
+      events.push({
+        date: baseDate,
+        weekday: dayName,
+        title: "Lessons",
+        raw_title: "Lessons",
+        category: "placeholder",
+        lanes: block.lanes,
+        start: startISO,
+        end: endISO,
+        start_time: formatTime(startISO),
+        end_time: formatTime(endISO),
+        is_placeholder: true,
+      });
+    });
+  }
+
+  return events;
+}
+
+// ============================================================================
+// RENDER SCHEDULE
+// ============================================================================
+
+function renderSchedule(rawData) {
+  const grid = document.getElementById("scheduleGrid");
+  const assocName = document.getElementById("assocName");
+  const weekRange = document.getElementById("weekRange");
+  const legend = document.getElementById("legend");
+
+  grid.innerHTML = "";
+  legend.innerHTML = "";
+
+  // Parse data: could be array or object with week/events structure
+  let events = Array.isArray(rawData) ? rawData : (rawData.events || []);
+  const weekData = !Array.isArray(rawData) ? rawData.week : null;
+
+  if (events.length === 0) {
+    grid.innerHTML = '<div class="error-state">No events found in data.</div>';
+    return;
+  }
+
+  // Normalize: handle both "day" and "weekday" fields
+  events = events.map(e => ({
+    ...e,
+    weekday: e.weekday || e.day,
+  }));
+
+  // Swim Team is active September-May only.
+  events = events.filter(e => {
+    const title = (e.title || "").toLowerCase();
+    if (!title.includes("swim team")) return true;
+    const dateStr = e.date || (e.start ? String(e.start).slice(0, 10) : "");
+    return isSwimTeamSeasonFromDate(dateStr);
+  });
+
+  // Update header
+  if (!Array.isArray(rawData) && rawData.association) {
+    assocName.textContent = `${rawData.association.name}: ${rawData.association.studio}`;
+  } else {
+    assocName.textContent = "YMCA Lap Pool Schedule";
+  }
+
+  if (weekData) {
+    weekRange.textContent = `${weekData.start_date} to ${weekData.end_date}`;
+  } else if (events.length > 0) {
+    const dates = events.map(e => e.date).sort();
+    if (dates.length > 0) {
+      weekRange.textContent = `${dates[0]} to ${dates[dates.length - 1]}`;
+    }
+  }
+
+  // Build day-date map
+  const dayDateMap = {};
+  events.forEach(e => {
+    if (!dayDateMap[e.weekday]) {
+      dayDateMap[e.weekday] = e.date;
+    }
+  });
+
+  // Merge in placeholder events (Swim Team & Lessons)
+  DAY_ORDER.forEach(dayName => {
+    const date = dayDateMap[dayName];
+    if (date) {
+      const placeholders = buildPlaceholderEvents(date, dayName, events);
+      events = events.concat(placeholders);
+    }
+  });
+
+  // Filter to display week and sort
+  events.sort((a, b) => {
+    const dayIndexA = DAY_ORDER.indexOf(a.weekday);
+    const dayIndexB = DAY_ORDER.indexOf(b.weekday);
+    if (dayIndexA !== dayIndexB) return dayIndexA - dayIndexB;
+    const startA = minutesSinceMidnight(a.start);
+    const startB = minutesSinceMidnight(b.start);
+    return startA - startB;
+  });
+
+  // Collect used colors for legend
+  const usedColors = new Set();
+  events.forEach(e => {
+    usedColors.add(getEventColorClass(e));
+  });
+
+  // Build legend
+  const legendHTML = Array.from(usedColors)
+    .sort()
+    .map(color => `
+      <span class="legend-item">
+        <span class="legend-swatch ${color}"></span>
+        <span>${COLOR_LABELS[color] || color}</span>
+      </span>
+    `)
+    .join("");
+  legend.innerHTML = legendHTML;
+
+  // Grid layout constants
+  const displayStartMin = 300; // 5:00 AM
+  const displayEndMin = 1290; // 21:30 (9:30 PM)
+  const hourHeight = 60; // CSS var --hour-height
+  const gridHeight = ((displayEndMin - displayStartMin) / 60) * hourHeight;
+
+  // Render schedule grid
+  grid.style.minHeight = `${60 + gridHeight}px`; // header + content
+
+  // Corner cell
+  const corner = document.createElement("div");
+  corner.className = "grid-corner";
+  corner.textContent = "Time";
+  grid.appendChild(corner);
+
+  // Day headers
+  DAY_ORDER.forEach(dayName => {
+    const header = document.createElement("div");
+    header.className = "day-header";
+    const dateStr = dayDateMap[dayName] || "";
+    header.innerHTML = `
+      <div class="day-name">${dayName}</div>
+      <div class="day-date">${formatDateShort(dateStr)}</div>
+    `;
+    grid.appendChild(header);
+  });
+
+  // Time column
+  const timeCol = document.createElement("div");
+  timeCol.className = "time-col";
+  timeCol.style.height = `${gridHeight}px`;
+
+  for (let h = 5; h <= 21; h++) {
+    const label = document.createElement("div");
+    label.className = "time-label";
+    label.style.top = `${((h - 5) * 60 / (displayEndMin - displayStartMin) * 100)}%`;
+    const hh = h > 12 ? h - 12 : h;
+    const suffix = h >= 12 ? "PM" : "AM";
+    label.textContent = `${hh}:00${suffix[0]}`;
+    timeCol.appendChild(label);
+  }
+  grid.appendChild(timeCol);
+
+  // Day columns with events
+  const eventsByDay = {};
+  DAY_ORDER.forEach(day => { eventsByDay[day] = []; });
+  events.forEach(e => {
+    if (eventsByDay[e.weekday]) {
+      eventsByDay[e.weekday].push(e);
+    }
+  });
+
+  DAY_ORDER.forEach(dayName => {
+    const col = document.createElement("div");
+    col.className = "day-col";
+    col.style.height = `${gridHeight}px`;
+    col.style.position = "relative";
+
+    if (dayName === "Saturday" || dayName === "Sunday") {
+      const topNull = document.createElement("div");
+      topNull.className = "null-space-block";
+      topNull.style.top = `${minutesToPercent(300, displayStartMin, displayEndMin)}%`;
+      topNull.style.height = `${durationToPercent(300, 420, displayStartMin, displayEndMin)}%`;
+      col.appendChild(topNull);
+
+      const bottomNull = document.createElement("div");
+      bottomNull.className = "null-space-block";
+      bottomNull.style.top = `${minutesToPercent(1110, displayStartMin, displayEndMin)}%`;
+      bottomNull.style.height = `${durationToPercent(1110, 1290, displayStartMin, displayEndMin)}%`;
+      col.appendChild(bottomNull);
+    }
+
+    const dayEvents = eventsByDay[dayName];
+
+    // Check if this day has real Swim Team or Lessons
+    const hasRealSwimTeam = dayEvents.some(e => !e.is_placeholder && e.title.toLowerCase().includes("swim team"));
+    const hasRealLessons = dayEvents.some(e => !e.is_placeholder && e.title.toLowerCase().includes("lesson"));
+    const shouldHideProgram = hasRealSwimTeam || hasRealLessons;
+
+    // Filter out Program In Progress if we have real Lessons/Swim Team
+    const visibleEvents = shouldHideProgram
+      ? dayEvents.filter(e => !e.title.toLowerCase().includes("program in progress"))
+      : dayEvents;
+
+    visibleEvents.forEach(event => {
+      const startMin = minutesSinceMidnight(event.start);
+      const endMin = minutesSinceMidnight(event.end);
+
+      const topPercent = minutesToPercent(startMin, displayStartMin, displayEndMin);
+      const heightPercent = durationToPercent(startMin, endMin, displayStartMin, displayEndMin);
+
+      let { lane_start, lane_span } = getLaneStartAndSpan(event);
+      ({ lane_start, lane_span } = adjustLapSwimForSwimTeam(event, visibleEvents, lane_start, lane_span));
+
+      const el = document.createElement("div");
+      el.className = `event ${getEventColorClass(event)}`;
+
+      const laneWidthPercent = 100 / 6;
+      el.style.top = `${topPercent}%`;
+      el.style.height = `${heightPercent}%`;
+      el.style.left = `${lane_start * laneWidthPercent}%`;
+      el.style.width = `${lane_span * laneWidthPercent}%`;
+      el.style.zIndex = "2";
+
+      const minHeight = 30;
+      const actualHeightPx = (heightPercent / 100) * gridHeight;
+      if (actualHeightPx < 45) el.classList.add("compact");
+      if (actualHeightPx < 30) el.classList.add("tiny");
+      if (lane_span === 1) el.classList.add("one-lane");
+
+      const title = event.title;
+      const displayLanes = Number(event.lanes) || lane_span;
+      const laneLabel = displayLanes ? ` (${displayLanes})` : "";
+      const startLabel = event.start_time || formatTime(event.start);
+      const endLabel = event.end_time || formatTime(event.end);
+      const time = `${startLabel}-${endLabel}`;
+
+      el.innerHTML = `
+        <div class="event-title">${escapeHtml(title)}${escapeHtml(laneLabel)}</div>
+        <div class="event-time">${escapeHtml(time)}</div>
+      `;
+
+      col.appendChild(el);
+    });
+
+    grid.appendChild(col);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+// ============================================================================
+// EVENT LISTENERS
+// ============================================================================
+
+document.getElementById("loadDefaultBtn").addEventListener("click", async () => {
+  try {
+    const res = await fetch("./lap_pool_week.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load lap_pool_week.json");
+    const data = await res.json();
+    renderSchedule(data);
+  } catch (err) {
+    alert(
+      err.message +
+      "\n\nRun the Python script first (python ymca_fetch.py), then serve this folder with:\n" +
+      "python -m http.server"
+    );
+  }
+});
+
+window.addEventListener("load", () => {
+  document.getElementById("loadDefaultBtn").click();
+});
+
+</script>
+
+</body>
+</html>
