@@ -1,10 +1,12 @@
 import json
+import pathlib
 from datetime import datetime
 
+path = pathlib.Path(__file__).parent
 
 def read_json():
     """read the lap pool events json file"""
-    with open("lap_pool_week.json", encoding="utf-8") as f:
+    with open(path / "lap_pool_week.json", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -61,7 +63,7 @@ def build_status(events: list):
 
 def write_status(status: dict):
     """write the status to a json file"""
-    with open("status.json", "w", encoding="utf-8") as f:
+    with open(path / "status.json", "w", encoding="utf-8") as f:
         json.dump(status, f, indent=2)
 
 
