@@ -84,6 +84,7 @@ LESSONS_SCHEDULE = {
 
 
 def fetch_wrapped_json(params: dict) -> dict:
+    """Fetch the schedule data and convert to json data"""
     query = urlencode(params)
     request = Request(f"{URL}?{query}", headers={"User-Agent": "Mozilla/5.0"})
     with urlopen(request, timeout=30) as response:
@@ -95,6 +96,7 @@ def fetch_wrapped_json(params: dict) -> dict:
 
 
 def week_monday_to_sunday() -> tuple[datetime, datetime]:
+    """Get the current week's Monday and Sunday datetimes"""
     now = datetime.now()
     monday = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
     sunday = monday + timedelta(days=6)
@@ -102,12 +104,14 @@ def week_monday_to_sunday() -> tuple[datetime, datetime]:
 
 
 def strip_html(text: str) -> str:
+    """Strip HTML tags from a string."""
     if not text:
         return ""
     return re.sub(r"<[^>]+>", "", unescape(text)).strip()
 
 
 def parse_time_range(date_str: str, time_range: str) -> tuple[datetime, datetime]:
+    """Parse date and time range into start and end datetimes"""
     start_s, end_s = [x.strip() for x in time_range.split("-", 1)]
     start_dt = datetime.strptime(f"{date_str} {start_s}", "%A, %B %d, %Y %I:%M%p")
     end_dt = datetime.strptime(f"{date_str} {end_s}", "%A, %B %d, %Y %I:%M%p")
@@ -115,19 +119,23 @@ def parse_time_range(date_str: str, time_range: str) -> tuple[datetime, datetime
 
 
 def clean_title(title: str) -> str:
+    """Clean the event title to remove lane counts"""
     return re.sub(r"\s*\(\d+\s+lane[s]?\)\s*$", "", title, flags=re.IGNORECASE).strip()
 
 
 def extract_lane_count(title: str) -> Optional[int]:
+    """Extract lane count from the title"""
     match = re.search(r"\((\d+)\s+lane[s]?\)", title, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 
 def minutes_since_midnight(dt: datetime) -> int:
+    """Get the minutes since midnight for a given datetime"""
     return dt.hour * 60 + dt.minute
 
 
 def format_time_label(dt: datetime) -> str:
+    """Format time label"""
     return dt.strftime("%I:%M%p").lstrip("0").lower()
 
 
@@ -137,6 +145,7 @@ def is_swim_team_season(date_obj: datetime) -> bool:
 
 
 def parse_schedule_rows(payload: dict) -> list[dict]:
+    """Parse the schedule rows from the API payload into a list of event dicts"""
     events: list[dict] = []
     for row in payload.get("aaData", []):
         if len(row) < 6:
@@ -300,6 +309,7 @@ def add_fixed_schedule(events: list[dict], week_start: datetime) -> None:
 
 
 def sort_events(events: list[dict]) -> list[dict]:
+    """Sort events by day, start time, end time, and title."""
     return sorted(
         events,
         key=lambda e: (
@@ -363,7 +373,8 @@ def adjust_evening_lap_swim_position(events: list[dict]) -> None:
                 break
 
 
-def main() -> None:
+def fetch_schedule() -> None:
+    """Fetch the schedule and write to a JSON file."""
     parser = argparse.ArgumentParser(description="Fetch YMCA pool schedule with fixed Lessons/Swim Team blocks.")
     parser.add_argument("--output", default="lap_pool_week.json", help="Output JSON path")
     args = parser.parse_args()
@@ -407,4 +418,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    fetch_schedule()
