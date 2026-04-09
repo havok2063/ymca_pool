@@ -37,18 +37,22 @@ def publish_status():
 def publish_discovery():
     """Publish the device discovery info to HA using MQTT"""
     payload = {
+        # device info
         "dev": {
             "ids": ["ymca_pool"],
             "name": "YMCA Pool",
             "mf": "Custom",
             "mdl": "Pool Schedule",
         },
+        # origin info
         "o": {
             "name": "ymca_pool_publisher",
             "sw": "1.0.0",
             "url": "https://github.com/havok2063/ymca_pool",
         },
+        # topic to listen for updates
         "state_topic": MQTT_TOPIC,
+        # components info - defines HA entities
         "cmps": {
             "current_event": {
                 "p": "sensor",

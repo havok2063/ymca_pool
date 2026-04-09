@@ -12,7 +12,8 @@ def read_json():
 
 def build_status(events: list):
     """Create a current status dict from the list of pool events"""
-    now = datetime.now()
+    local_tz = datetime.now().astimezone().tzinfo
+    now = datetime.now().astimezone()
 
     current = None
     next_event = None
@@ -24,9 +25,18 @@ def build_status(events: list):
     def is_lap_swim(event):
         return "Lap Swim" in event.get("title", "")
 
+    def parse_local_iso(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=local_tz)
+        return parsed.astimezone(local_tz)
+
+    def format_timestamp(value: datetime) -> str:
+        return value.astimezone(local_tz).isoformat(timespec="seconds")
+
     for e in sorted(events, key=lambda x: x["start"]):
-        start = datetime.fromisoformat(e["start"])
-        end = datetime.fromisoformat(e["end"])
+        start = parse_local_iso(e["start"])
+        end = parse_local_iso(e["end"])
         is_active = start <= now <= end
         lanes = e.get("lanes") or 0
 
@@ -51,10 +61,10 @@ def build_status(events: list):
         lanes_used = 6
 
     return {
-        "current_time": now.isoformat(timespec="seconds"),
+        "current_time": format_timestamp(now),
         "now": current.get("raw_title", current["title"]) if current else "None",
         "next": next_event.get("raw_title", next_event["title"]) if next_event else "None",
-        "next_time": next_event["start"] if next_event else None,
+        "next_time": format_timestamp(parse_local_iso(next_event["start"])) if next_event else None,
         "lanes_used": lanes_used,
         "lanes_free": lanes_free,
         "active_events": active_events,
